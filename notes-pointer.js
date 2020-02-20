@@ -1,3 +1,4 @@
+const redDotPointer = 'redDotPointer';
 /**
  * Handles opening of and synchronization with the reveal.js
  * notes window.
@@ -12,12 +13,15 @@
 var RevealNotes = (function() {
     var config = Reveal.getConfig();
     var options = config.notes_pointer || {};
-    var pointer_options = options.pointer || {};
+    var red_dot_pointer_options = options.redDotPointer || {};
+    console.log(options.redDotPointer)
+    var blue_dot_pointer_options = options.blueDotPointer || {};
     var notes_options = options.notes || {};
 
     var notesPopup = null;
 
     function addKeyBinding(key, keyCode, defaultKey, description, binding) {
+        console.log('tatat')
         if (key === undefined && keyCode === undefined) {
             key = defaultKey;
         }
@@ -178,18 +182,13 @@ var RevealNotes = (function() {
         var body = document.querySelector('body');
         var slides = document.querySelector('.slides');
 
-        var s = pointer_options.size || 15;
+        var activePointerStyle = redDotPointer;
+
 
         var pointer = document.createElement('div');
-        pointer.style.position = 'absolute';
-        pointer.style.width = s + 'px';
-        pointer.style.height = s + 'px';
-        pointer.style.marginLeft = '-' + Math.round(s / 2) + 'px';
-        pointer.style.marginTop = '-' + Math.round(s / 2) + 'px';
-        pointer.style.backgroundColor = pointer_options.color || 'rgba(255, 0, 0, 0.8)';
-        pointer.style.borderRadius = '50%';
-        pointer.style.zIndex = 20;
+        toRedDotPointer();
         pointer.style.display = 'none';
+
         slides.appendChild(pointer);  // a *slides* element, so position scales
 
         function trackMouse(e) {
@@ -205,13 +204,15 @@ var RevealNotes = (function() {
             var offsetX = (e.clientX - slides_left) / scale;
             var offsetY = (e.clientY - slides_top) / scale;
 
-            point(offsetX, offsetY, true);
-            postPointer(offsetX, offsetY, true);
+            point(offsetX, offsetY,activePointerStyle, true);
+            postPointer(offsetX, offsetY, activePointerStyle, true);
         }
 
         function point(x, y, state) {
-            if (state === true) {
-                showPointer();
+            console.log(...arguments)
+            debugger
+            if (state.state === true) {
+                showPointer(state.color);
             } else if (state === false) {
                 hidePointer();
             }
@@ -221,14 +222,16 @@ var RevealNotes = (function() {
             pointer.style.top = y + 'px';
         }
 
-        function postPointer(x, y, state) {
+        function postPointer(x, y, color, state) {
             if (notesPopup) {
                 notesPopup.postMessage(JSON.stringify({
                     namespace: 'reveal-notes',
                     type: 'point',
                     x: x,
                     y: y,
-                    state: state
+                    state: {
+                        state, color
+                    }
                 }), '*');
             } else if (Reveal.getConfig().postMessageEvents && window.parent !== window.self) {
                 window.parent.postMessage(JSON.stringify({
@@ -236,21 +239,57 @@ var RevealNotes = (function() {
                     type: 'point',
                     x: x,
                     y: y,
-                    state: state
+                    state: {
+                        state, color
+                    }
                 }), '*');
             }
         }
 
-        function showPointer() {
+        function toRedDotPointer() {
+            var s = red_dot_pointer_options.size || 15;
+            pointer.style.position = 'absolute';
+            pointer.style.width = s + 'px';
+            pointer.style.height = s + 'px';
+            pointer.style.marginLeft = '-' + Math.round(s / 2) + 'px';
+            pointer.style.marginTop = '-' + Math.round(s / 2) + 'px';
+            pointer.style.backgroundColor = red_dot_pointer_options.color || 'rgba(255, 0, 0, 0.8)';
+            pointer.style.borderRadius = '50%';
+            pointer.style.zIndex = 20;
+        }
+        function toBlueDotPointer() {
+            var s = blue_dot_pointer_options.size || 15;
+            pointer.style.position = 'absolute';
+            pointer.style.width = s + 'px';
+            pointer.style.height = s + 'px';
+            pointer.style.marginLeft = '-' + Math.round(s / 2) + 'px';
+            pointer.style.marginTop = '-' + Math.round(s / 2) + 'px';
+            pointer.style.backgroundColor = blue_dot_pointer_options.color || 'rgba(0, 0, 255, 0.8)';
+            pointer.style.borderRadius = '50%';
+            pointer.style.zIndex = 20;
+        }
+
+        function showPointer(color) {
             pointer.style.display = 'block';
+            activePointerStyle = color || activePointerStyle;
+            switch(activePointerStyle) {
+                case redDotPointer :
+                    toRedDotPointer();
+                    break;
+                case 'blueDotPointer' :
+                    toBlueDotPointer();
+                    break;
+                default:
+                    toRedDotPointer()
+            }
         }
 
         function hidePointer() {
             pointer.style.display = 'none';
         }
 
-        function pointerOn() {
-            showPointer();
+        function pointerOn(pointerStyle) {
+            showPointer(pointerStyle);
             body.style.cursor = 'none';
             if( !callbackSet ) {
                 document.addEventListener('mousemove', trackMouse);
@@ -267,19 +306,38 @@ var RevealNotes = (function() {
                 callbackSet = false;
             }
             isPointing = false;
-            postPointer(0, 0, false);
+            postPointer(0, 0,redDotPointer, false);
         }
 
-        function togglePointer() {
+        function togglePointer(pointerStyle) {
+            pointerStyle = pointerStyle || redDotPointer
+            console.log('lol' ,pointerStyle)
             if (isPointing) {
                 pointerOff();
             } else {
-                pointerOn();
+                pointerOn(pointerStyle);
             }
         }
 
-        addKeyBinding(pointer_options.key, pointer_options.keyCode, 'A',
-                      'Toggle pointer', togglePointer);
+        function getRedDotTogglePointer() {
+            return () => {
+                activePointerStyle = redDotPointer
+                return togglePointer(redDotPointer)
+            }
+        }
+
+        function getBlueDotTogglePointer() {
+            return () => {
+                activePointerStyle = 'blueDotPointer'
+                return togglePointer('blueDotPointer')
+            }
+        }
+
+        addKeyBinding(red_dot_pointer_options.key, red_dot_pointer_options.keyCode, 'A',
+            'Toggle pointer', getRedDotTogglePointer());
+
+        addKeyBinding(blue_dot_pointer_options.key, blue_dot_pointer_options.keyCode, 'Z',
+            'Toggle pointer', getBlueDotTogglePointer());
 
         return {point: point, togglePointer: togglePointer};
     })();
@@ -304,7 +362,6 @@ var RevealNotes = (function() {
         }
     }
 
-
     if( !/receiver/i.test( window.location.search ) ) {
 
         // If the there's a 'notes' query set, open directly
@@ -314,7 +371,7 @@ var RevealNotes = (function() {
 
         // Open the notes when the 's' key is hit
         addKeyBinding(notes_options.key, notes_options.keyCode, 'S',
-                      'Speaker notes view', function() { openNotes(); });
+            'Speaker notes view', function() { openNotes(); });
     }
 
     return { open: openNotes, RevealPointer: RevealPointer };
